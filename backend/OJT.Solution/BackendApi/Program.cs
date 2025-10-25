@@ -90,8 +90,12 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// New: read a config flag to control applying migrations on startup. Default is false.
+var applyMigrationsOnStartup = builder.Configuration.GetValue<bool?>("ApplyMigrationsOnStartup") ?? false;
+
 // Áp dụng migration tự động CHỈ cho Development hoặc Staging (an toàn cho người mới học)
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+// Disabled by default to avoid startup failures when database/schema is not ready.
+if ((app.Environment.IsDevelopment() || app.Environment.IsStaging()) && applyMigrationsOnStartup)
 {
     using (var scope = app.Services.CreateScope())
     {

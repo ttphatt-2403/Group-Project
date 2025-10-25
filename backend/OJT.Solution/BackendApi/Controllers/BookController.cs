@@ -110,7 +110,7 @@ namespace BackendApi.Controllers
 
         // GET: api/Book/search?query=...
         [HttpGet("search")]
-        public async Task<ActionResult<IEnumerable<object>>> SearchBooks([FromQuery] string query = "")
+        public async Task<ActionResult<object>> SearchBooks([FromQuery] string query = "")
         {
             // Pagination for search
             return await SearchBooksPaged(query);
