@@ -35,13 +35,19 @@ namespace BackendApi.Controllers
                     b.ReturnDate,
                     b.Status,
                     b.Notes,
-                    User = new
+                    User = b.User == null ? null : new
                     {
                         b.User.Id,
                         b.User.Username,
                         b.User.Fullname,
                         b.User.Email
                     },
+                    Guest = b.User == null ? new
+                    {
+                        b.GuestName,
+                        b.GuestEmail,
+                        b.GuestPhone
+                    } : null,
                     Book = new
                     {
                         b.Book.Id,
@@ -79,7 +85,7 @@ namespace BackendApi.Controllers
                     b.ReturnDate,
                     b.Status,
                     b.Notes,
-                    User = new
+                    User = b.User == null ? null : new
                     {
                         b.User.Id,
                         b.User.Username,
@@ -87,6 +93,12 @@ namespace BackendApi.Controllers
                         b.User.Email,
                         b.User.Phone
                     },
+                    Guest = b.User == null ? new
+                    {
+                        b.GuestName,
+                        b.GuestEmail,
+                        b.GuestPhone
+                    } : null,
                     Book = new
                     {
                         b.Book.Id,
@@ -162,7 +174,7 @@ namespace BackendApi.Controllers
                     b.BorrowDate,
                     b.DueDate,
                     DaysOverdue = (currentDate - b.DueDate).Days,
-                    User = new
+                    User = b.User == null ? null : new
                     {
                         b.User.Id,
                         b.User.Username,
@@ -170,6 +182,7 @@ namespace BackendApi.Controllers
                         b.User.Email,
                         b.User.Phone
                     },
+                    Guest = b.User == null ? new { b.GuestName, b.GuestEmail, b.GuestPhone } : null,
                     Book = new
                     {
                         b.Book.Id,
@@ -194,139 +207,196 @@ namespace BackendApi.Controllers
                 return BadRequest(ModelState);
             }
 
-            // Kiểm tra User có tồn tại không
-            var userExists = await _context.Users.AnyAsync(u => u.Id == dto.UserId);
-            if (!userExists)
+            // Validate userId or guest info
+            if (!dto.UserId.HasValue)
             {
-                return BadRequest(new { message = "User không tồn tại." });
-            }
-
-            // Kiểm tra Book có tồn tại không
-            var book = await _context.Books.FindAsync(dto.BookId);
-            if (book == null)
-            {
-                return BadRequest(new { message = "Sách không tồn tại." });
-            }
-
-            // Kiểm tra sách còn available không
-            if (book.AvailableCopies <= 0)
-            {
-                return BadRequest(new { message = "Sách đã hết, không thể mượn." });
-            }
-
-            // Kiểm tra user đã mượn sách này chưa trả chưa
-            var existingBorrow = await _context.Borrows
-                .AnyAsync(b => b.UserId == dto.UserId &&
-                              b.BookId == dto.BookId &&
-                              b.Status == "borrowed");
-
-            if (existingBorrow)
-            {
-                return BadRequest(new { message = "User đã mượn sách này và chưa trả." });
-            }
-
-            // Map DTO -> entity
-            var borrow = new Borrow
-            {
-                UserId = dto.UserId,
-                BookId = dto.BookId,
-                BorrowDate = dto.BorrowDate ?? DateTime.Now,
-                DueDate = dto.DueDate == null || dto.DueDate == default ? DateTime.Now.AddDays(14) : dto.DueDate.Value,
-                Status = "borrowed",
-                Notes = dto.Notes,
-                Createdat = DateTime.Now,
-                Updatedat = DateTime.Now
-            };
-
-            // Giảm AvailableCopies
-            book.AvailableCopies = (book.AvailableCopies ?? 0) - 1;
-
-            _context.Borrows.Add(borrow);
-            await _context.SaveChangesAsync();
-
-            // Load related data for response
-            await _context.Entry(borrow)
-                .Reference(b => b.User)
-                .LoadAsync();
-            await _context.Entry(borrow)
-                .Reference(b => b.Book)
-                .LoadAsync();
-
-            // Build response DTO
-            var response = new BorrowResponse
-            {
-                Id = borrow.Id,
-                UserId = borrow.UserId,
-                BookId = borrow.BookId,
-                BorrowDate = borrow.BorrowDate,
-                DueDate = borrow.DueDate,
-                ReturnDate = borrow.ReturnDate,
-                Status = borrow.Status,
-                Notes = borrow.Notes,
-                Createdat = borrow.Createdat,
-                Updatedat = borrow.Updatedat,
-                User = new
+                if (string.IsNullOrWhiteSpace(dto.GuestName))
                 {
-                    borrow.User.Id,
-                    borrow.User.Username,
-                    borrow.User.Fullname,
-                    borrow.User.Email
-                },
-                Book = new
-                {
-                    borrow.Book.Id,
-                    borrow.Book.Title,
-                    borrow.Book.Author
+                    return BadRequest(new { message = "GuestName is required for guest borrow." });
                 }
-            };
+            }
+            else
+            {
+                var userExists = await _context.Users.AnyAsync(u => u.Id == dto.UserId.Value);
+                if (!userExists)
+                {
+                    return BadRequest(new { message = "User không tồn tại." });
+                }
+            }
 
-            return CreatedAtAction(nameof(GetBorrow), new { id = borrow.Id }, response);
+            // Use transaction and SELECT FOR UPDATE to avoid race conditions
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Lock the book row
+                var book = await _context.Books
+                    .FromSqlRaw("SELECT * FROM books WHERE id = {0} FOR UPDATE", dto.BookId)
+                    .AsTracking()
+                    .FirstOrDefaultAsync();
+
+                if (book == null)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { message = "Sách không tồn tại." });
+                }
+
+                var available = book.AvailableCopies ?? 0;
+                if (available <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { message = "Sách đã hết, không thể mượn." });
+                }
+
+                // If registered user, check existing borrow
+                if (dto.UserId.HasValue)
+                {
+                    var existingBorrow = await _context.Borrows
+                        .AnyAsync(b => b.UserId == dto.UserId.Value && b.BookId == dto.BookId && b.Status == "borrowed");
+
+                    if (existingBorrow)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new { message = "User đã mượn sách này và chưa trả." });
+                    }
+                }
+
+                // Map DTO -> entity
+                var borrow = new Borrow
+                {
+                    UserId = dto.UserId,
+                    BookId = dto.BookId,
+                    BorrowDate = dto.BorrowDate ?? DateTime.Now,
+                    DueDate = dto.DueDate == null || dto.DueDate == default ? DateTime.Now.AddDays(14) : dto.DueDate.Value,
+                    Status = "borrowed",
+                    Notes = dto.Notes,
+                    Createdat = DateTime.Now,
+                    Updatedat = DateTime.Now,
+                    GuestName = dto.GuestName,
+                    GuestEmail = dto.GuestEmail,
+                    GuestPhone = dto.GuestPhone
+                };
+
+                // Giảm AvailableCopies
+                book.AvailableCopies = available - 1;
+
+                _context.Borrows.Add(borrow);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                // Load related data for response
+                if (borrow.UserId.HasValue)
+                {
+                    await _context.Entry(borrow).Reference(b => b.User).LoadAsync();
+                }
+                await _context.Entry(borrow).Reference(b => b.Book).LoadAsync();
+
+                var response = new BorrowResponse
+                {
+                    Id = borrow.Id,
+                    UserId = borrow.UserId,
+                    BookId = borrow.BookId,
+                    BorrowDate = borrow.BorrowDate,
+                    DueDate = borrow.DueDate,
+                    ReturnDate = borrow.ReturnDate,
+                    Status = borrow.Status,
+                    Notes = borrow.Notes,
+                    Createdat = borrow.Createdat,
+                    Updatedat = borrow.Updatedat,
+                    User = borrow.User == null ? null : new
+                    {
+                        borrow.User.Id,
+                        borrow.User.Username,
+                        borrow.User.Fullname,
+                        borrow.User.Email
+                    },
+                    Guest = borrow.User == null ? new { borrow.GuestName, borrow.GuestEmail, borrow.GuestPhone } : null,
+                    Book = new
+                    {
+                        borrow.Book.Id,
+                        borrow.Book.Title,
+                        borrow.Book.Author
+                    }
+                };
+
+                return CreatedAtAction(nameof(GetBorrow), new { id = borrow.Id }, response);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // PUT: api/Borrow/5/return
         [HttpPut("{id}/return")]
-        public async Task<IActionResult> ReturnBook(int id, [FromBody] ReturnRequest request = null)
+        public async Task<IActionResult> ReturnBook(int id, [FromBody] ReturnRequest? request = null)
         {
-            var borrow = await _context.Borrows
-                .Include(b => b.Book)
-                .FirstOrDefaultAsync(b => b.Id == id);
-
-            if (borrow == null)
+            // Use transaction to update borrow and book atomically
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                return NotFound(new { message = "Không tìm thấy phiếu mượn này." });
-            }
+                var borrow = await _context.Borrows
+                    .Include(b => b.Book)
+                    .FirstOrDefaultAsync(b => b.Id == id);
 
-            if (borrow.Status != "borrowed")
-            {
-                return BadRequest(new { message = "Sách đã được trả hoặc trạng thái không hợp lệ." });
-            }
-
-            // Cập nhật thông tin trả sách
-            borrow.ReturnDate = DateTime.Now;
-            borrow.Status = "returned";
-            borrow.Notes = request?.Notes ?? borrow.Notes;
-            borrow.Updatedat = DateTime.Now;
-
-            // Tăng AvailableCopies
-            borrow.Book.AvailableCopies++;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Trả sách thành công.",
-                borrow = new
+                if (borrow == null)
                 {
-                    borrow.Id,
-                    borrow.ReturnDate,
-                    borrow.Status,
-                    Book = new
-                    {
-                        borrow.Book.Title,
-                        borrow.Book.AvailableCopies
-                    }
+                    await transaction.RollbackAsync();
+                    return NotFound(new { message = "Không tìm thấy phiếu mượn này." });
                 }
-            });
+
+                if (borrow.Status != "borrowed")
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { message = "Sách đã được trả hoặc trạng thái không hợp lệ." });
+                }
+
+                // Lock the book row for update
+                var book = await _context.Books
+                    .FromSqlRaw("SELECT * FROM books WHERE id = {0} FOR UPDATE", borrow.BookId)
+                    .AsTracking()
+                    .FirstOrDefaultAsync();
+
+                if (book == null)
+                {
+                    await transaction.RollbackAsync();
+                    return NotFound(new { message = "Book not found." });
+                }
+
+                // Cập nhật thông tin trả sách
+                borrow.ReturnDate = DateTime.Now;
+                borrow.Status = "returned";
+                borrow.Notes = request?.Notes ?? borrow.Notes;
+                borrow.Updatedat = DateTime.Now;
+
+                // Tăng AvailableCopies (treat null as 0)
+                book.AvailableCopies = (book.AvailableCopies ?? 0) + 1;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new
+                {
+                    message = "Trả sách thành công.",
+                    borrow = new
+                    {
+                        borrow.Id,
+                        borrow.ReturnDate,
+                        borrow.Status,
+                        Book = new
+                        {
+                            borrow.Book.Title,
+                            borrow.Book.AvailableCopies
+                        }
+                    }
+                });
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // PUT: api/Borrow/5
@@ -406,7 +476,7 @@ namespace BackendApi.Controllers
             // Nếu sách chưa trả, tăng lại AvailableCopies
             if (borrow.Status == "borrowed")
             {
-                borrow.Book.AvailableCopies++;
+                borrow.Book.AvailableCopies = (borrow.Book.AvailableCopies ?? 0) + 1;
             }
 
             _context.Borrows.Remove(borrow);

@@ -5,7 +5,7 @@ namespace BackendApi.Dtos
     public class BorrowResponse
     {
         public int Id { get; set; }
-        public int UserId { get; set; }
+        public int? UserId { get; set; }
         public int BookId { get; set; }
         public DateTime BorrowDate { get; set; }
         public DateTime DueDate { get; set; }
@@ -17,6 +17,7 @@ namespace BackendApi.Dtos
 
         // Simple nested info for response
         public object? User { get; set; }
+        public object? Guest { get; set; }
         public object? Book { get; set; }
     }
 }

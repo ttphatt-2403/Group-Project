@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using BackendApi.Models;
 using BackendApi.Dtos;
 using BCrypt.Net;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BackendApi.Controllers
 {
@@ -10,7 +11,12 @@ namespace BackendApi.Controllers
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
     {
-        // ...existing code...
+        private readonly OjtDbContext _context;
+
+        public UsersController(OjtDbContext context)
+        {
+            _context = context;
+        }
 
         // PATCH: api/Users/{id}
         [HttpPatch("{id}")]
@@ -36,6 +42,34 @@ namespace BackendApi.Controllers
             public bool? Isactive { get; set; }
         }
 
+        // PUT: api/Users/{id}/role  (admin only)
+        [HttpPut("{id}/role")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> UpdateUserRole(int id, [FromBody] UpdateRoleRequest dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Role))
+                return BadRequest(new { message = "Role is required." });
+
+            var role = dto.Role.Trim().ToLower();
+            var allowed = new[] { "user", "admin" };
+            if (!allowed.Contains(role))
+                return BadRequest(new { message = "Invalid role. Allowed: user, admin." });
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { message = "Không tìm thấy người dùng." });
+
+            user.Role = role;
+            user.Updatedat = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Cập nhật role thành công.", userId = user.Id, role = user.Role });
+        }
+
+        public class UpdateRoleRequest
+        {
+            public string? Role { get; set; }
+        }
+
         // GET: api/Users/search?keyword=abc
         [HttpGet("search")]
         public async Task<ActionResult<IEnumerable<UserResponse>>> SearchUsers([FromQuery] string keyword)
@@ -47,9 +81,9 @@ namespace BackendApi.Controllers
 
             var users = await _context.Users
                 .Where(u =>
-                    u.Fullname.Contains(keyword) ||
-                    u.Username.Contains(keyword) ||
-                    u.Email.Contains(keyword)
+                    (u.Fullname ?? string.Empty).Contains(keyword) ||
+                    (u.Username ?? string.Empty).Contains(keyword) ||
+                    (u.Email ?? string.Empty).Contains(keyword)
                 )
                 .Select(u => new UserResponse
                 {
@@ -68,12 +102,6 @@ namespace BackendApi.Controllers
                 .ToListAsync();
 
             return Ok(users);
-        }
-        private readonly OjtDbContext _context;
-
-        public UsersController(OjtDbContext context)
-        {
-            _context = context;
         }
 
         // GET: api/Users

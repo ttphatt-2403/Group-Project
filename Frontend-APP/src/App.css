@@ -1,0 +1,163 @@
+/* App global layout and theme complements for Library Manager */
+
+/* Hero / Landing */
+.hero {
+  padding: 3.5rem 1rem;
+  text-align: center;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0.4)
+  );
+  margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-size: 2.6rem;
+  letter-spacing: -0.5px;
+  margin-bottom: 0.5rem;
+}
+.hero p.lead {
+  color: rgba(11, 36, 71, 0.7);
+  margin-bottom: 1.2rem;
+}
+
+/* Featured books grid */
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.book-card {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(246, 249, 255, 0.98)
+  );
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 10px 26px rgba(11, 36, 71, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.book-card .title {
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+.book-card .author {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.book-card .meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Card image */
+.book-cover {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(11, 61, 145, 0.05);
+}
+
+/* Forms */
+.form-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+.form-field input,
+.form-field textarea,
+.form-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(11, 36, 71, 0.06);
+  background: linear-gradient(180deg, #fbfdff, #f7fbff);
+  outline: none;
+}
+.form-field input:focus,
+.form-field textarea:focus {
+  box-shadow: 0 6px 18px rgba(42, 109, 246, 0.06);
+  border-color: var(--brand-blue);
+}
+.error {
+  color: #b91c1c;
+  margin-top: 6px;
+}
+
+/* Navbar small helpers (do not override major navbar styles already defined) */
+.app-navbar .avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(250, 250, 255, 0.9)
+  );
+  color: #fff;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--brand-primary);
+  box-shadow: 0 6px 18px rgba(11, 61, 145, 0.08);
+}
+.user-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.user-name {
+  color: #fff;
+  font-weight: 600;
+}
+.logout-btn {
+  background: linear-gradient(90deg, #ff8a6b, #ff6b6b);
+  border: none;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(11, 36, 71, 0.04);
+}
+th {
+  text-align: left;
+  color: var(--brand-blue);
+}
+
+/* Footer */
+.app-footer {
+  margin-top: 2rem;
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Responsive tweaks */
+@media (max-width: 880px) {
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .hero h1 {
+    font-size: 1.8rem;
+  }
+}

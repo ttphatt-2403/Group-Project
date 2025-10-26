@@ -47,10 +47,10 @@ namespace BackendApi.Controllers
                     b.AvailableCopies,
                     b.ImageUrl,
                     b.CategoryId,
-                    Category = new
+                    Category = b.Category == null ? null : new
                     {
-                        b.Category.Id,
-                        b.Category.Name
+                        CategoryId = b.CategoryId,
+                        Name = b.Category.Name
                     },
                     b.Createdat,
                     b.Updatedat
@@ -88,11 +88,11 @@ namespace BackendApi.Controllers
                     b.AvailableCopies,
                     b.ImageUrl,
                     b.CategoryId,
-                    Category = new
+                    Category = b.Category == null ? null : new
                     {
-                        b.Category.Id,
-                        b.Category.Name,
-                        b.Category.Description
+                        CategoryId = b.CategoryId,
+                        Name = b.Category.Name,
+                        Description = b.Category.Description
                     },
                     BorrowCount = b.Borrows.Count(br => br.Status == "borrowed"),
                     b.Createdat,
@@ -129,11 +129,12 @@ namespace BackendApi.Controllers
 
             if (!string.IsNullOrEmpty(query))
             {
+                var q = query.ToLower();
                 books = books.Where(b =>
-                    b.Title.ToLower().Contains(query.ToLower()) ||
-                    b.Author.ToLower().Contains(query.ToLower()) ||
-                    b.Isbn.Contains(query) ||
-                    b.Category.Name.ToLower().Contains(query.ToLower())
+                    (b.Title ?? string.Empty).ToLower().Contains(q) ||
+                    (b.Author ?? string.Empty).ToLower().Contains(q) ||
+                    (b.Isbn ?? string.Empty).ToLower().Contains(q) ||
+                    (b.Category != null && (b.Category.Name ?? string.Empty).ToLower().Contains(q))
                 );
             }
 
@@ -152,10 +153,10 @@ namespace BackendApi.Controllers
                     b.Isbn,
                     b.Publisher,
                     b.AvailableCopies,
-                    Category = new
+                    Category = b.Category == null ? null : new
                     {
-                        b.Category.Id,
-                        b.Category.Name
+                        CategoryId = b.CategoryId,
+                        Name = b.Category.Name
                     }
                 })
                 .ToListAsync();
@@ -184,10 +185,10 @@ namespace BackendApi.Controllers
                     b.Title,
                     b.Author,
                     b.AvailableCopies,
-                    Category = new
+                    Category = b.Category == null ? null : new
                     {
-                        b.Category.Id,
-                        b.Category.Name
+                        CategoryId = b.CategoryId,
+                        Name = b.Category.Name
                     }
                 })
                 .ToListAsync();
