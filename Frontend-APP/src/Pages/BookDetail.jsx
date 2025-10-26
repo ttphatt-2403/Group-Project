@@ -13,6 +13,10 @@ const BookDetail = () => {
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestLoading, setGuestLoading] = useState(false);
 
   useEffect(() => {
     const fetch = async () => {
@@ -65,6 +69,37 @@ const BookDetail = () => {
       setBook((b) => ({ ...b, availableCopies: (b.availableCopies ?? 0) - 1 }));
     } catch (err) {
       alert(err?.response?.data?.message || err.message);
+    }
+  };
+
+  const handleGuestBorrow = async (e) => {
+    e && e.preventDefault();
+    try {
+      if (!guestName || guestName.trim().length === 0) {
+        alert("Vui lòng nhập tên của bạn để mượn sách.");
+        return;
+      }
+      setGuestLoading(true);
+
+      const payload = {
+        bookId: parseInt(id, 10),
+        guestName: guestName.trim(),
+        guestEmail: guestEmail?.trim() || null,
+        guestPhone: guestPhone?.trim() || null,
+      };
+
+      const res = await axios.post(buildApiUrl(API_ENDPOINTS.BORROWS), payload);
+
+      alert("Mượn sách thành công (khách).");
+      setBook((b) => ({ ...b, availableCopies: (b.availableCopies ?? 0) - 1 }));
+      // clear guest form
+      setGuestName("");
+      setGuestEmail("");
+      setGuestPhone("");
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message);
+    } finally {
+      setGuestLoading(false);
     }
   };
 
@@ -154,7 +189,51 @@ const BookDetail = () => {
                     return null; // admin sees edit controls elsewhere
                   }
                 } catch (e) {}
-                return null;
+
+                // guest view: show a small guest borrow form when not logged in
+                return (
+                  <form
+                    onSubmit={handleGuestBorrow}
+                    style={{ display: "inline-block" }}
+                  >
+                    <div
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
+                    >
+                      <input
+                        placeholder="Tên của bạn (bắt buộc)"
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6 }}
+                        required
+                      />
+                      <input
+                        placeholder="Email (tuỳ chọn)"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6 }}
+                      />
+                      <input
+                        placeholder="SĐT (tuỳ chọn)"
+                        value={guestPhone}
+                        onChange={(e) => setGuestPhone(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6 }}
+                      />
+                      <button
+                        className="btn-primary"
+                        type="submit"
+                        disabled={
+                          guestLoading || (book.availableCopies ?? 0) <= 0
+                        }
+                      >
+                        {guestLoading
+                          ? "Đang gửi..."
+                          : book.availableCopies > 0
+                          ? "Mượn (khách)"
+                          : "Hết hàng"}
+                      </button>
+                    </div>
+                  </form>
+                );
               })()}
             </div>
           </div>

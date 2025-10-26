@@ -15,6 +15,9 @@ public partial class Category
     [StringLength(500)]
     public string? Description { get; set; }
 
+    [StringLength(200)]
+    public string? ImageUrl { get; set; }
+
     public DateTime? Createdat { get; set; }
 
     public DateTime? Updatedat { get; set; }

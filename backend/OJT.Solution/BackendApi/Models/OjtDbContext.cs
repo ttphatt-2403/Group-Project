@@ -94,6 +94,9 @@ public partial class OjtDbContext : DbContext
             entity.Property(e => e.Description)
                 .HasMaxLength(500)
                 .HasColumnName("description");
+            entity.Property(e => e.ImageUrl)
+                .HasMaxLength(200)
+                .HasColumnName("imageurl");
             entity.Property(e => e.Createdat)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone")

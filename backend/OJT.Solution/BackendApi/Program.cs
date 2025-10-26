@@ -121,6 +121,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Serve static files from wwwroot (required for uploaded images under /uploads)
+app.UseStaticFiles();
+
 app.UseCors(MyAllowSpecificOrigins);
 
 app.UseAuthentication();

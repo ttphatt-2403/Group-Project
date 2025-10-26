@@ -1,4 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using System.IO;
+using System;
 using BackendApi.Models;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
@@ -10,10 +14,12 @@ namespace BackendApi.Controllers
     public class CategoryController : ControllerBase
     {
         private readonly OjtDbContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public CategoryController(OjtDbContext context)
+        public CategoryController(OjtDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
         // GET: api/Category
@@ -26,7 +32,8 @@ namespace BackendApi.Controllers
                 {
                     Id = c.Id,
                     Name = c.Name,
-                    Description = c.Description
+                    Description = c.Description,
+                    ImageUrl = c.ImageUrl
                 })
                 .ToListAsync();
 
@@ -43,7 +50,8 @@ namespace BackendApi.Controllers
                 {
                     Id = c.Id,
                     Name = c.Name,
-                    Description = c.Description
+                    Description = c.Description,
+                    ImageUrl = c.ImageUrl
                 })
                 .FirstOrDefaultAsync();
 
@@ -79,6 +87,7 @@ namespace BackendApi.Controllers
             {
                 Name = model.Name,
                 Description = model.Description,
+                ImageUrl = model.ImageUrl,
                 Createdat = DateTime.Now,
                 Updatedat = DateTime.Now
             };
@@ -90,7 +99,8 @@ namespace BackendApi.Controllers
             {
                 Id = category.Id,
                 Name = category.Name,
-                Description = category.Description
+                Description = category.Description,
+                ImageUrl = category.ImageUrl
             });
         }
 
@@ -127,6 +137,7 @@ namespace BackendApi.Controllers
 
             existingCategory.Name = model.Name;
             existingCategory.Description = model.Description;
+            existingCategory.ImageUrl = model.ImageUrl;
             existingCategory.Updatedat = DateTime.Now;
 
             await _context.SaveChangesAsync();
@@ -135,7 +146,8 @@ namespace BackendApi.Controllers
             {
                 Id = existingCategory.Id,
                 Name = existingCategory.Name,
-                Description = existingCategory.Description
+                Description = existingCategory.Description,
+                ImageUrl = existingCategory.ImageUrl
             });
         }
 
@@ -166,6 +178,44 @@ namespace BackendApi.Controllers
         private bool CategoryExists(int id)
         {
             return _context.Categories.Any(e => e.Id == id);
+        }
+
+        // POST: api/Category/upload/5
+        // Upload a single image file and set the Category.ImageUrl to the uploaded file's public URL.
+        [HttpPost("upload/{id}")]
+        public async Task<IActionResult> UploadCategoryImage(int id, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null)
+                return NotFound(new { message = "Category not found." });
+
+            // ensure uploads folder exists
+            var uploadsRoot = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", "categories");
+            Directory.CreateDirectory(uploadsRoot);
+
+            // use a GUID filename to avoid collisions
+            var ext = Path.GetExtension(file.FileName);
+            var fileName = $"{Guid.NewGuid()}{ext}";
+            var filePath = Path.Combine(uploadsRoot, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // build public URL to the uploaded file
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var publicUrl = $"{baseUrl}/uploads/categories/{fileName}";
+
+            // update category
+            category.ImageUrl = publicUrl;
+            category.Updatedat = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { id = category.Id, imageUrl = category.ImageUrl });
         }
     }
 }

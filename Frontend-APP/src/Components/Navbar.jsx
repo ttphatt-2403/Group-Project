@@ -12,6 +12,7 @@ const UsernameBadge = ({ user }) => (
 const Navbar = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const [user, setUser] = useState(() => {
     try {
@@ -96,38 +97,102 @@ const Navbar = () => {
       </div>
 
       <div className={`nav-links ${open ? "open" : ""}`}>
-        {user && userRole === "admin" ? (
-          // Admin sees management links
-          <>
-            <Link to="/dashboard" className="nav-link">
-              Dashboard
-            </Link>
-            <Link to="/admin/books" className="nav-link">
-              Quản lý Sách
-            </Link>
-            <Link to="/admin/categories" className="nav-link">
-              Quản lý Thể loại
-            </Link>
-            <Link to="/admin/borrows" className="nav-link">
-              Quản lý Mượn trả
-            </Link>
-            <Link to="/admin/users" className="nav-link">
-              Quản lý Người dùng
-            </Link>
-          </>
-        ) : (
-          // Guests and regular users see public browsing links
-          <>
-            <Link to="/books" className="nav-link">
-              Sách
-            </Link>
-            <Link to="/categories" className="nav-link">
-              Thể loại
-            </Link>
-            <Link to="/borrows" className="nav-link">
-              Mượn trả
-            </Link>
-          </>
+        {/* Public links visible to everyone */}
+        <Link to="/" className="nav-link">
+          Trang chủ
+        </Link>
+        <Link to="/books" className="nav-link">
+          Sách
+        </Link>
+        <Link to="/categories" className="nav-link">
+          Thể loại
+        </Link>
+        <Link to="/borrows" className="nav-link">
+          Mượn trả
+        </Link>
+
+        {/* Admin dropdown (visible only to admin) */}
+        {user && userRole === "admin" && (
+          <div style={{ position: "relative" }}>
+            <button
+              className="nav-link"
+              onClick={() => setAdminOpen((v) => !v)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              Admin
+              <span style={adminBadgeStyle} aria-hidden>
+                Admin
+              </span>
+            </button>
+
+            {adminOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  background: "#fff",
+                  boxShadow: "0 6px 18px rgba(20,20,40,0.12)",
+                  borderRadius: 8,
+                  padding: 8,
+                  minWidth: 180,
+                  zIndex: 80,
+                }}
+              >
+                <Link
+                  to="/dashboard"
+                  className="nav-link"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/admin/books"
+                  className="nav-link"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Quản lý Sách
+                </Link>
+                <Link
+                  to="/admin/categories"
+                  className="nav-link"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Quản lý Thể loại
+                </Link>
+                <Link
+                  to="/admin/borrows"
+                  className="nav-link"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Quản lý Mượn trả
+                </Link>
+                <Link
+                  to="/admin/users"
+                  className="nav-link"
+                  onClick={() => setAdminOpen(false)}
+                >
+                  Quản lý Người dùng
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
+        {user && userRole === "user" && (
+          <Link to="/user" className="nav-link">
+            My Page{" "}
+            <span style={userBadgeStyle} aria-hidden>
+              User
+            </span>
+          </Link>
         )}
 
         {user && userRole === "user" && (
